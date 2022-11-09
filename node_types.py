@@ -4,7 +4,7 @@ NODE_TYPES = ['LIMIT', 'SORT', 'NESTED LOOP', 'MERGE JOIN', 'HASH', 'HASH JOIN',
 
 
 #Key attribute in a node that will help to identify which SQL query correspond to this node
-KEY_PROPERTY = {'LIMIT': ['Plan Rows'], 'SORT': ['Sort Key'], 'NESTED LOOP': [], 'MERGE JOIN': ['Merge Cond'],
+KEY_PROPERTY = {'LIMIT': ['Plan Rows'], 'SORT': ['Sort Key'], 'NESTED LOOP': ['Join Type'], 'MERGE JOIN': ['Merge Cond'],
                 'HASH': [], 'HASH JOIN': ['Hash Cond'], 'AGGREGATE': ['Group Key'], 'HASHAGGREGATE': ['Group Key'],
                 'SEQ SCAN': ['Relation Name', 'Filter'], 'INDEX SCAN': ['Index Cond', 'Filter'],
                 'INDEX ONLY SCAN': ['Index Cond', 'Filter', 'Alias'],

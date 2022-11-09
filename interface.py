@@ -2,12 +2,13 @@ import json
 import tkinter as tk
 from tkinter import font, messagebox
 from node_types import ATTRIBUTE
+from anytree import PreOrderIter
 import sqlparse
 import node_types
 import psycopg2
 import annotation
 
-def get_json(inputValue):
+def get_json(inputValue, permutations = ""):
         """ query parts from the parts table """
         
         conn = None
@@ -21,7 +22,7 @@ def get_json(inputValue):
                 password="password")
             
             cur = conn.cursor()
-            cur.execute("EXPLAIN (ANALYZE, VERBOSE, FORMAT JSON)" + inputValue)
+            cur.execute(permutations + "EXPLAIN (ANALYZE, VERBOSE, FORMAT JSON)" + inputValue)
             rows = cur.fetchall()
             x = json.dumps(rows)
 
@@ -233,15 +234,27 @@ class AnalysisFrame(tk.Frame):
         raw_json = node.raw_json
         print(raw_json)
         self.text.delete('1.0', 'end')
-        for index, (key, value) in enumerate(raw_json.items()):
-            if key == "Node Type":
-                for operations in ATTRIBUTE:
-                    if operations == value.upper():
-                        operation_type = ATTRIBUTE[operations]
-            if key in operation_type:
-                B = str(key) + ": " + str(value) + '\n'
-                self.text.insert('end', B)       
+        idk = ["NESTED LOOP", "MERGE JOIN", "HASH JOIN", 'SEQ SCAN', 'INDEX SCAN', 'INDEX ONLY SCAN', 'BITMAP INDEX SCAN', 'CTE SCAN']
+        if node.id in idk:
+            self.text.insert('end', node.aqp_cost)
+        else:
+            for index, (key, value) in enumerate(raw_json.items()):
+                if key == "Node Type":
+                    for operations in ATTRIBUTE:
+                        if operations == value.upper():
+                            operation_type = ATTRIBUTE[operations]
+                if key in operation_type:
+                    B = str(key) + ": " + str(value) + '\n'
+                    self.text.insert('end', B)       
 
+        # for index, (key, value) in enumerate(raw_json.items()):
+        #         if key == "Node Type":
+        #             for operations in ATTRIBUTE:
+        #                 if operations == value.upper():
+        #                     operation_type = ATTRIBUTE[operations]
+        #         if key in operation_type:
+        #             B = str(key) + ": " + str(value) + '\n'
+        #             self.text.insert('end', B)
 #executing the input query, linking to analysis page
 def execute_query(root_widget, query):
     plan = get_json(query)
@@ -270,6 +283,43 @@ def execute_query(root_widget, query):
     root_node = annotation.build_tree([plan[0]['Plan']])[0]
     match_dict = annotation.build_invert_relation(query, root_node)
 
+    print("jump")
+    # aggregate = ['HASHAGGREGATE']
+    # sorts = ['SORT', 'SORT']
+    loops = ["NESTED LOOP", "MERGE JOIN", "HASH JOIN"]
+    scans = ['SEQ SCAN', 'INDEX SCAN', 'INDEX ONLY SCAN', 'BITMAP INDEX SCAN', 'CTE SCAN']
+    dict2convert = {"NESTED LOOP":"nestloop", "MERGE JOIN":"mergejoin", "HASH JOIN": "hashjoin", 'SEQ SCAN':'seqscan', 'INDEX SCAN':'indexscan', 'INDEX ONLY SCAN':'indexonlyscan', 'BITMAP INDEX SCAN':'bitmapscan', 'CTE SCAN':'seqscan', 'HASHAGGREGATE':'hashagg', 'CTE SCAN':'tidscan', 'SORT':'sort'}
+
+
+    for node in PreOrderIter(root_node):
+        if node.id in loops:
+            permutations = loops
+        elif node.id in scans:
+            permutations = scans
+        # elif node.id in aggregate:
+        #     permutations = aggregate
+        # elif node.id in sorts:
+        #     permutations = sorts
+        else:
+            continue
+        setattr(node, "aqp_cost", "")
+        cost = {}
+        to_exclude = permutations.index(node.id)
+        for j in range(len(permutations)):
+            if j != to_exclude:
+                disable = ""
+                for k in range(len(permutations)):
+                    if k != j:
+                        disable += "set enable_" + dict2convert[permutations[k]] + " to off; \n"
+                new_cost = aqp_cost(query, disable)
+                if new_cost not in cost.values():
+                    cost[permutations[j]] = new_cost
+        keys = list(cost.keys())
+
+        for key in keys:
+            node.aqp_cost += node.id  +" is  "+ str(cost[key]/node.raw_json['Total Cost']) + " times faster than "+key if key != "BITMAP INDEX SCAN" else "BITMAP SCAN" +"\n"
+    
+
     def on_click_listener(node):
         analysis_frame.show_node_info(node)
 
@@ -286,5 +336,13 @@ def execute_query(root_widget, query):
     tree_frame.set_on_hover_end_listener(on_hover_end_listener)
 
     tree_frame.draw_tree(root_node)
-        
+
+def aqp_cost(query , permute):
+    plan = get_json(query, permute)
+    plan = plan[2:-2]
+    plan = json.loads(plan)
+    root_node = annotation.build_tree([plan[0]['Plan']])[0]
+    match_dict = annotation.build_invert_relation(query, root_node)
+    return list(match_dict.keys())[0].raw_json['Total Cost']
+
    
