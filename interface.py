@@ -234,7 +234,7 @@ class AnalysisFrame(tk.Frame):
         raw_json = node.raw_json
         print(raw_json)
         self.text.delete('1.0', 'end')
-        idk = ["NESTED LOOP", "MERGE JOIN", "HASH JOIN", 'SEQ SCAN', 'INDEX SCAN', 'INDEX ONLY SCAN', 'BITMAP INDEX SCAN', 'CTE SCAN']
+        idk = ['HASHAGGREGATE',"SORT","NESTED LOOP", "MERGE JOIN", "HASH JOIN", 'SEQ SCAN', 'INDEX SCAN', 'INDEX ONLY SCAN', 'BITMAP INDEX SCAN', 'CTE SCAN']
         if node.id in idk:
             self.text.insert('end', node.aqp_cost)
         else:
@@ -284,8 +284,8 @@ def execute_query(root_widget, query):
     match_dict = annotation.build_invert_relation(query, root_node)
 
     print("jump")
-    # aggregate = ['HASHAGGREGATE']
-    # sorts = ['SORT', 'SORT']
+    aggregate = ['HASHAGGREGATE','HASHAGGREGATE']
+    sorts = ['SORT', 'SORT']
     loops = ["NESTED LOOP", "MERGE JOIN", "HASH JOIN"]
     scans = ['SEQ SCAN', 'INDEX SCAN', 'INDEX ONLY SCAN', 'BITMAP INDEX SCAN', 'CTE SCAN']
     dict2convert = {"NESTED LOOP":"nestloop", "MERGE JOIN":"mergejoin", "HASH JOIN": "hashjoin", 'SEQ SCAN':'seqscan', 'INDEX SCAN':'indexscan', 'INDEX ONLY SCAN':'indexonlyscan', 'BITMAP INDEX SCAN':'bitmapscan', 'CTE SCAN':'seqscan', 'HASHAGGREGATE':'hashagg', 'CTE SCAN':'tidscan', 'SORT':'sort'}
@@ -298,8 +298,8 @@ def execute_query(root_widget, query):
             permutations = scans
         # elif node.id in aggregate:
         #     permutations = aggregate
-        # elif node.id in sorts:
-        #     permutations = sorts
+        elif node.id in sorts:
+            permutations = sorts
         else:
             continue
         setattr(node, "aqp_cost", "")
@@ -312,13 +312,15 @@ def execute_query(root_widget, query):
                     if k != j:
                         disable += "set enable_" + dict2convert[permutations[k]] + " to off; \n"
                 new_cost = aqp_cost(query, disable)
-                if new_cost not in cost.values():
+                if new_cost not in cost.values() and new_cost != node.raw_json['Total Cost']:
                     cost[permutations[j]] = new_cost
         keys = list(cost.keys())
-
+        setattr(node, "alternative_costs", cost)
         for key in keys:
-            node.aqp_cost += node.id  +" is  "+ str(cost[key]/node.raw_json['Total Cost']) + " times faster than "+key if key != "BITMAP INDEX SCAN" else "BITMAP SCAN" +"\n"
-    
+            node.aqp_cost += node.id  +" is  "+ str(cost[key]/node.raw_json['Total Cost']) + " times faster than "+(key if key != "BITMAP INDEX SCAN" else "BITMAP SCAN")+"\n"
+        
+        if node.aqp_cost == "":
+            node.aqp_cost = "No other alternatives are possible."
 
     def on_click_listener(node):
         analysis_frame.show_node_info(node)
