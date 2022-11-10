@@ -51,14 +51,6 @@ CONTENT_STYLE = {
     "padding": "2rem 1rem",
 }
 
-IMG_STYLE = {
-    "height": "50%",
-    "width": "50%",
-    "display": "block",
-    "margin-left": "auto",
-    "margin-right": "auto",
-}
-
 sidebar = html.Div(
     [
         html.H2("DBP Query \nOptimiser", className="display-4"),
@@ -81,7 +73,6 @@ sidebar = html.Div(
 
 content = html.Div([
     dcc.Dropdown(['Choice A', 'Choice B'], 'Choice B', id='dropdown'),
-    html.Img(src=r'assets/tree.png', style=IMG_STYLE),
     dcc.Graph(
         id='example-graph',
         figure=fig
