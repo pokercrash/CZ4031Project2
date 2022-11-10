@@ -289,36 +289,47 @@ def execute_query(root_widget, query):
     loops = ["NESTED LOOP", "MERGE JOIN", "HASH JOIN"]
     scans = ['SEQ SCAN', 'INDEX SCAN', 'INDEX ONLY SCAN', 'BITMAP INDEX SCAN', 'CTE SCAN']
     dict2convert = {"NESTED LOOP":"nestloop", "MERGE JOIN":"mergejoin", "HASH JOIN": "hashjoin", 'SEQ SCAN':'seqscan', 'INDEX SCAN':'indexscan', 'INDEX ONLY SCAN':'indexonlyscan', 'BITMAP INDEX SCAN':'bitmapscan', 'CTE SCAN':'seqscan', 'HASHAGGREGATE':'hashagg', 'CTE SCAN':'tidscan', 'SORT':'sort'}
+    cache = {}
 
-
+    qep_cost = root_node.raw_json['Total Cost']
     for node in PreOrderIter(root_node):
         if node.id in loops:
             permutations = loops
         elif node.id in scans:
             permutations = scans
-        # elif node.id in aggregate:
-        #     permutations = aggregate
+        elif node.id in aggregate:
+            permutations = aggregate
         elif node.id in sorts:
             permutations = sorts
         else:
             continue
         setattr(node, "aqp_cost", "")
         cost = {}
-        to_exclude = permutations.index(node.id)
-        for j in range(len(permutations)):
-            if j != to_exclude:
-                disable = ""
-                for k in range(len(permutations)):
-                    if k != j:
-                        disable += "set enable_" + dict2convert[permutations[k]] + " to off; \n"
-                new_cost = aqp_cost(query, disable)
-                if new_cost not in cost.values() and new_cost != node.raw_json['Total Cost']:
-                    cost[permutations[j]] = new_cost
-        keys = list(cost.keys())
-        setattr(node, "alternative_costs", cost)
-        for key in keys:
-            node.aqp_cost += node.id  +" is  "+ str(cost[key]/node.raw_json['Total Cost']) + " times faster than "+(key if key != "BITMAP INDEX SCAN" else "BITMAP SCAN")+"\n"
+        if node.id in cache:
+            cost = cache[node.id]
+            keys = list(cost.keys())
+            setattr(node, "alternative_costs", cost)
+            for key in keys:
+                node.aqp_cost += node.id  +" is  "+ str(cost[key]/qep_cost) + " times faster than "+(key if key != "BITMAP INDEX SCAN" else "BITMAP SCAN")+"\n"
         
+        else:
+            to_exclude = permutations.index(node.id)
+            for j in range(len(permutations)):
+                if j != to_exclude:
+                    disable = ""
+                    for k in range(len(permutations)):
+                        if k != j:
+                            disable += "set enable_" + dict2convert[permutations[k]] + " to off; \n"
+                    new_cost = aqp_cost(query, disable)
+                    if new_cost not in cost.values() and new_cost != node.raw_json['Total Cost']:
+                        cost[permutations[j]] = new_cost 
+
+            keys = list(cost.keys())
+            setattr(node, "alternative_costs", cost)
+            cache[node.id] = cost
+            for key in keys:
+                node.aqp_cost += node.id  +" is  "+ str(cost[key]/qep_cost) + " times faster than "+(key if key != "BITMAP INDEX SCAN" else "BITMAP SCAN")+"\n"
+            
         if node.aqp_cost == "":
             node.aqp_cost = "No other alternatives are possible."
 
@@ -344,7 +355,6 @@ def aqp_cost(query , permute):
     plan = plan[2:-2]
     plan = json.loads(plan)
     root_node = annotation.build_tree([plan[0]['Plan']])[0]
-    match_dict = annotation.build_invert_relation(query, root_node)
-    return list(match_dict.keys())[0].raw_json['Total Cost']
+    return root_node.raw_json['Total Cost']
 
    
