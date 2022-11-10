@@ -268,10 +268,10 @@ def execute_query(root_widget, query):
     top_level.iconphoto(False, tk.PhotoImage(file='tree.png'))
     query = query.replace('\n', ' ')
     query = sqlparse.format(query, reindent=True, keyword_case='upper')
-
+    
     query_frame = QueryFrame(top_level)
     query_frame.set_query(query)
-    
+
     query_frame.grid(row=0, column=0, sticky='ew')
 
     analysis_frame = AnalysisFrame(top_level)
@@ -321,7 +321,7 @@ def execute_query(root_widget, query):
                         if k != j:
                             disable += "set enable_" + dict2convert[permutations[k]] + " to off; \n"
                     new_cost = aqp_cost(query, disable)
-                    if new_cost not in cost.values() and new_cost != node.raw_json['Total Cost']:
+                    if new_cost not in cost.values() and new_cost != qep_cost:
                         cost[permutations[j]] = new_cost 
 
             keys = list(cost.keys())
