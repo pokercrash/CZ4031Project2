@@ -58,6 +58,8 @@ def build_invert_relation(query_formatted, tree):
     match_dict = {}  # Has structure {node object : [list of tuples of index]}
     tokens = tokenize_query(query_formatted)
     for node in PreOrderIter(tree):
+        
+
         if getattr(node, 'id') not in node_types.KEY_PROPERTY:
             continue
         else:
@@ -71,6 +73,7 @@ def build_invert_relation(query_formatted, tree):
                         match_dict[node] = match_dict[node] + matched_pos
                     else:
                         match_dict[node] = matched_pos
+
     return match_dict
 
 
